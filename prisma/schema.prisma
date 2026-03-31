@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @db.VarChar(100)
+  slug        String    @unique @db.VarChar(120)
+  description String?   @db.Text
+  image       String?   @db.VarChar(255)
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  parentId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(200)
+  slug        String   @unique @db.VarChar(220)
+  description String?  @db.Text
+  price       Decimal  @db.Decimal(10, 2)
+  comparePrice Decimal? @db.Decimal(10, 2)
+  sku         String?  @unique @db.VarChar(50)
+  stock       Int      @default(0)
+  image       String?  @db.VarChar(255)
+  images      Json?
+  isActive    Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  categoryId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category        Category         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  productPincodes ProductPincode[]
+  orderItems      OrderItem[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([sku])
+  @@map("products")
+}
+
+model Customer {
+  id              String    @id @default(uuid())
+  name            String    @db.VarChar(100)
+  phone           String    @unique @db.VarChar(20)
+  email           String?   @unique @db.VarChar(255)
+  isPhoneVerified Boolean   @default(false)
+  isEmailVerified Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  addresses    Address[]
+  orders       Order[]
+  coupons      Coupon[]
+  couponUsages CouponUsage[]
+
+  @@index([phone])
+  @@index([email])
+  @@map("customers")
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  label        String?  @db.VarChar(50)
+  addressLine1 String   @db.VarChar(255)
+  addressLine2 String?  @db.VarChar(255)
+  landmark     String?  @db.VarChar(255)
+  city         String   @db.VarChar(100)
+  state        String   @db.VarChar(100)
+  postalCode   String   @db.VarChar(20)
+  country      String   @default("India") @db.VarChar(100)
+  phone        String?  @db.VarChar(20)
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+  isDefault    Boolean  @default(false)
+  customerId   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("addresses")
+}
+
+model ServiceablePincode {
+  id        String   @id @default(uuid())
+  pincode   String   @unique @db.VarChar(10)
+  city      String   @db.VarChar(100)
+  state     String   @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productPincodes ProductPincode[]
+
+  @@index([pincode])
+  @@map("serviceable_pincodes")
+}
+
+model ProductPincode {
+  id        String   @id @default(uuid())
+  productId String
+  pincodeId String
+  createdAt DateTime @default(now())
+
+  product Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  pincode ServiceablePincode @relation(fields: [pincodeId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, pincodeId])
+  @@index([pincodeId])
+  @@map("product_pincodes")
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT
+}
+
+enum PaymentMethod {
+  COD
+  RAZORPAY
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  orderNumber     String      @unique @db.VarChar(20)
+  customerId      String
+  status          OrderStatus @default(PENDING)
+  subtotal        Decimal     @db.Decimal(10, 2)
+  deliveryCharge  Decimal     @default(0) @db.Decimal(10, 2)
+  discount        Decimal     @default(0) @db.Decimal(10, 2)
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  deliveryAddress Json
+  notes           String?     @db.Text
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items       OrderItem[]
+  payment     Payment?
+  couponUsage CouponUsage?
+
+  @@index([customerId])
+  @@index([orderNumber])
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String  @id @default(uuid())
+  orderId      String
+  productId    String
+  productName  String  @db.VarChar(200)
+  productImage String? @db.VarChar(255)
+  productPrice Decimal @db.Decimal(10, 2)
+  quantity     Int
+  totalPrice   Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id                 String        @id @default(uuid())
+  orderId            String        @unique
+  method             PaymentMethod
+  status             PaymentStatus @default(PENDING)
+  amount             Decimal       @db.Decimal(10, 2)
+  razorpayOrderId    String?       @unique @db.VarChar(255)
+  razorpayPaymentId  String?       @db.VarChar(255)
+  razorpaySignature  String?       @db.VarChar(255)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Coupon {
+  id                 String         @id @default(uuid())
+  code               String         @unique @db.VarChar(50)
+  description        String?        @db.Text
+  discountType       DiscountType
+  discountValue      Decimal        @db.Decimal(10, 2)
+  maxDiscountAmount  Decimal?       @db.Decimal(10, 2)
+  minOrderAmount     Decimal?       @db.Decimal(10, 2)
+  paymentMethod      PaymentMethod?
+  isFirstOrderOnly   Boolean        @default(false)
+  customerId         String?
+  maxUses            Int?
+  maxUsesPerCustomer Int?
+  currentUses        Int            @default(0)
+  validFrom          DateTime
+  validUntil         DateTime
+  isFeatured         Boolean        @default(false)
+  banner             String?        @db.VarChar(255)
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  couponUsages CouponUsage[]
+
+  @@index([code])
+  @@index([customerId])
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id         String   @id @default(uuid())
+  couponId   String
+  customerId String
+  orderId    String   @unique
+  createdAt  DateTime @default(now())
+
+  coupon   Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, orderId])
+  @@index([couponId, customerId])
+  @@map("coupon_usages")
+}

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Razorpay Payment Test</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #1a1a2e; padding: 24px; }
+    h1 { text-align: center; margin-bottom: 8px; font-size: 24px; }
+    .subtitle { text-align: center; color: #666; margin-bottom: 24px; font-size: 14px; }
+    .container { max-width: 720px; margin: 0 auto; }
+
+    .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .card h2 { font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .step-num { background: #5469d4; color: #fff; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .step-done .step-num { background: #30b566; }
+
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #444; }
+    input, select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 10px; }
+    input:focus, select:focus { outline: none; border-color: #5469d4; box-shadow: 0 0 0 2px rgba(84,105,212,0.15); }
+
+    button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #5469d4; color: #fff; }
+    .btn-success { background: #30b566; color: #fff; }
+    .btn-orange { background: #f37254; color: #fff; }
+
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+
+    .creds { background: #f0f4ff; border-radius: 8px; padding: 12px 16px; font-size: 13px; line-height: 1.7; }
+    .creds code { background: #dde4f6; padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+
+    .log { background: #1a1a2e; color: #a8d8a8; border-radius: 8px; padding: 14px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; max-height: 260px; overflow-y: auto; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .status-PENDING { background: #fff3cd; color: #856404; }
+    .status-CONFIRMED { background: #d4edda; color: #155724; }
+    .status-PAID { background: #d4edda; color: #155724; }
+    .status-FAILED { background: #f8d7da; color: #721c24; }
+
+    .order-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+    .order-summary dt { font-weight: 600; color: #666; }
+    .order-summary dd { text-align: right; }
+
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .product-card { border: 2px solid #eee; border-radius: 10px; padding: 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+    .product-card:hover { border-color: #5469d4; }
+    .product-card.selected { border-color: #5469d4; box-shadow: 0 0 0 2px rgba(84,105,212,0.25); }
+    .product-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; background: #f0f0f0; }
+    .product-card .name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .product-card .price { color: #5469d4; font-weight: 700; }
+    .product-card .stock { font-size: 11px; color: #888; }
+
+    .hidden { display: none; }
+
+    .address-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+    .address-form .full { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Razorpay Payment Test</h1>
+    <p class="subtitle">Real payment flow with Razorpay test mode</p>
+
+    <!-- Test Credentials -->
+    <div class="card">
+      <h2>Test Credentials</h2>
+      <div class="creds">
+        <strong>Card:</strong> <code>4111 1111 1111 1111</code> &mdash; any future expiry, any CVV<br/>
+        <strong>UPI (success):</strong> <code>success@razorpay</code><br/>
+        <strong>UPI (failure):</strong> <code>failure@razorpay</code>
+      </div>
+    </div>
+
+    <!-- Step 1: Auth -->
+    <div class="card" id="step-auth">
+      <h2><span class="step-num">1</span> Authenticate</h2>
+      <div class="row">
+        <div>
+          <label>Phone</label>
+          <input type="text" id="phone" value="9999900001" />
+        </div>
+        <div>
+          <label>OTP</label>
+          <input type="text" id="otp" value="000000" />
+        </div>
+        <div>
+          <label>Name (new account)</label>
+          <input type="text" id="name" value="Test User" />
+        </div>
+      </div>
+      <button class="btn-primary" onclick="doAuth()">Send OTP & Login</button>
+    </div>
+
+    <!-- Step 2: Products -->
+    <div class="card hidden" id="step-products">
+      <h2><span class="step-num">2</span> Select a Product</h2>
+      <div id="product-list" class="product-grid"></div>
+      <div style="margin-top: 12px;">
+        <label>Quantity</label>
+        <input type="number" id="quantity" value="1" min="1" max="10" style="width: 80px;" />
+      </div>
+    </div>
+
+    <!-- Step 3: Address -->
+    <div class="card hidden" id="step-address">
+      <h2><span class="step-num">3</span> Delivery Address</h2>
+      <div id="existing-addresses"></div>
+      <div id="address-form-wrapper">
+        <p style="font-size: 13px; color: #666; margin-bottom: 10px;">No addresses found. Create one:</p>
+        <div class="address-form">
+          <div class="full">
+            <label>Address Line 1</label>
+            <input type="text" id="addr-line1" value="123 Test Street" />
+          </div>
+          <div>
+            <label>City</label>
+            <input type="text" id="addr-city" value="Mumbai" />
+          </div>
+          <div>
+            <label>State</label>
+            <input type="text" id="addr-state" value="Maharashtra" />
+          </div>
+          <div>
+            <label>Postal Code</label>
+            <input type="text" id="addr-pincode" value="400001" />
+          </div>
+          <div>
+            <label>Phone</label>
+            <input type="text" id="addr-phone" value="9999900001" />
+          </div>
+        </div>
+        <button class="btn-primary" onclick="createAddress()">Save Address</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Create Order & Pay -->
+    <div class="card hidden" id="step-pay">
+      <h2><span class="step-num">4</span> Create Order & Pay</h2>
+      <button class="btn-orange" id="btn-pay" onclick="createOrderAndPay()">Create Order & Open Razorpay</button>
+    </div>
+
+    <!-- Step 5: Order Status -->
+    <div class="card hidden" id="step-status">
+      <h2><span class="step-num">5</span> Order Status</h2>
+      <dl class="order-summary" id="order-info"></dl>
+      <div style="margin-top: 12px; text-align: center;" id="status-area"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <h2>Log</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+<script>
+const API = '/api/v1';
+let token = '';
+let selectedProductId = '';
+let selectedAddressId = '';
+let currentOrderId = '';
+let pollTimer = null;
+
+// --- Logging ---
+function log(msg) {
+  const el = document.getElementById('log');
+  const ts = new Date().toLocaleTimeString();
+  el.textContent += `[${ts}] ${msg}\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// --- API helper ---
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (body) opts.body = JSON.stringify(body);
+
+  log(`${method} ${path}`);
+  const res = await fetch(`${API}${path}`, opts);
+  const json = await res.json();
+  if (!json.success) {
+    log(`ERROR: ${json.message}`);
+    throw new Error(json.message);
+  }
+  return json;
+}
+
+function markDone(stepId) {
+  document.getElementById(stepId).classList.add('step-done');
+}
+function show(stepId) {
+  document.getElementById(stepId).classList.remove('hidden');
+}
+
+// --- Step 1: Auth ---
+async function doAuth() {
+  try {
+    const phone = document.getElementById('phone').value;
+    const otp = document.getElementById('otp').value;
+    const name = document.getElementById('name').value;
+
+    await api('POST', '/customers/auth/send-otp', { phone });
+    log('OTP sent');
+
+    const verifyRes = await api('POST', '/customers/auth/verify-otp', { phone, otp, name });
+    token = verifyRes.data.token;
+    log(`Authenticated as ${verifyRes.data.customer.name || phone} (${verifyRes.data.isNewCustomer ? 'new' : 'existing'})`);
+    markDone('step-auth');
+
+    await loadProducts();
+    await loadAddresses();
+  } catch (e) {
+    log(`Auth failed: ${e.message}`);
+  }
+}
+
+// --- Step 2: Products ---
+async function loadProducts() {
+  const res = await api('GET', '/products?limit=20&inStock=true');
+  const products = res.data;
+  const grid = document.getElementById('product-list');
+  grid.innerHTML = '';
+
+  if (!products.length) {
+    grid.innerHTML = '<p style="color:#888">No products found. Seed the DB first.</p>';
+    show('step-products');
+    return;
+  }
+
+  products.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'product-card';
+    card.dataset.id = p.id;
+    card.innerHTML = `
+      ${p.image ? `<img src="${p.image}" alt="${p.name}" />` : `<div style="height:120px;background:#eee;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#aaa;margin-bottom:8px;">No image</div>`}
+      <div class="name">${p.name}</div>
+      <div class="price">&#8377;${parseFloat(p.price).toFixed(2)}</div>
+      <div class="stock">Stock: ${p.stock}</div>
+    `;
+    card.onclick = () => selectProduct(p.id);
+    grid.appendChild(card);
+  });
+
+  show('step-products');
+  log(`Loaded ${products.length} products`);
+}
+
+function selectProduct(id) {
+  selectedProductId = id;
+  document.querySelectorAll('.product-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.id === id);
+  });
+  log(`Selected product: ${id}`);
+  checkReadyToPay();
+}
+
+// --- Step 3: Address ---
+async function loadAddresses() {
+  const res = await api('GET', '/customers/me/addresses');
+  const addresses = res.data;
+
+  if (addresses.length > 0) {
+    selectedAddressId = addresses[0].id;
+    const wrapper = document.getElementById('existing-addresses');
+    wrapper.innerHTML = addresses.map(a => `
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+        <input type="radio" name="address" value="${a.id}" ${a.id === selectedAddressId ? 'checked' : ''} onchange="selectedAddressId=this.value; checkReadyToPay();" />
+        <span style="font-size:13px;">${a.label ? `<strong>${a.label}</strong> - ` : ''}${a.addressLine1}, ${a.city} ${a.postalCode}</span>
+      </label>
+    `).join('');
+    document.getElementById('address-form-wrapper').querySelector('p').textContent = 'Or create a new one:';
+    log(`Loaded ${addresses.length} address(es), selected: ${selectedAddressId}`);
+  }
+
+  show('step-address');
+  checkReadyToPay();
+}
+
+async function createAddress() {
+  try {
+    const res = await api('POST', '/customers/me/addresses', {
+      addressLine1: document.getElementById('addr-line1').value,
+      city: document.getElementById('addr-city').value,
+      state: document.getElementById('addr-state').value,
+      postalCode: document.getElementById('addr-pincode').value,
+      phone: document.getElementById('addr-phone').value,
+    });
+    selectedAddressId = res.data.id;
+    log(`Address created: ${selectedAddressId}`);
+    markDone('step-address');
+    await loadAddresses();
+  } catch (e) {
+    log(`Address creation failed: ${e.message}`);
+  }
+}
+
+function checkReadyToPay() {
+  if (selectedProductId && selectedAddressId) {
+    show('step-pay');
+  }
+}
+
+// --- Step 4: Create Order & Pay ---
+async function createOrderAndPay() {
+  const btn = document.getElementById('btn-pay');
+  btn.disabled = true;
+  btn.textContent = 'Creating order...';
+
+  try {
+    const quantity = parseInt(document.getElementById('quantity').value) || 1;
+    const res = await api('POST', '/orders', {
+      addressId: selectedAddressId,
+      items: [{ productId: selectedProductId, quantity }],
+      paymentMethod: 'RAZORPAY',
+    });
+
+    const order = res.data;
+    currentOrderId = order.id;
+    const checkout = order.razorpayCheckout;
+
+    log(`Order created: ${order.orderNumber} | Total: ₹${order.totalAmount}`);
+    log(`Razorpay Order ID: ${checkout.razorpayOrderId}`);
+
+    showOrderStatus(order);
+
+    // Open Razorpay Checkout
+    const options = {
+      key: checkout.razorpayKeyId,
+      amount: checkout.amount,
+      currency: checkout.currency,
+      name: 'Test Store',
+      description: `Order ${order.orderNumber}`,
+      order_id: checkout.razorpayOrderId,
+      handler: function (response) {
+        log(`Payment successful!`);
+        log(`razorpay_payment_id: ${response.razorpay_payment_id}`);
+        log(`razorpay_order_id: ${response.razorpay_order_id}`);
+        log(`razorpay_signature: ${response.razorpay_signature}`);
+        log('Waiting for webhook to update order status...');
+        startPolling();
+      },
+      modal: {
+        ondismiss: function () {
+          log('Razorpay popup closed without payment');
+          btn.disabled = false;
+          btn.textContent = 'Retry Payment';
+        },
+      },
+      prefill: {
+        contact: document.getElementById('phone').value,
+      },
+      theme: { color: '#5469d4' },
+    };
+
+    log('Opening Razorpay checkout...');
+    const rzp = new Razorpay(options);
+    rzp.on('payment.failed', function (response) {
+      log(`Payment failed: ${response.error.description}`);
+      btn.disabled = false;
+      btn.textContent = 'Retry Payment';
+    });
+    rzp.open();
+  } catch (e) {
+    log(`Order creation failed: ${e.message}`);
+    btn.disabled = false;
+    btn.textContent = 'Create Order & Open Razorpay';
+  }
+}
+
+// --- Step 5: Poll Order Status ---
+function showOrderStatus(order) {
+  show('step-status');
+  updateOrderDisplay(order);
+}
+
+function updateOrderDisplay(order) {
+  const info = document.getElementById('order-info');
+  info.innerHTML = `
+    <dt>Order #</dt><dd>${order.orderNumber}</dd>
+    <dt>Total</dt><dd>&#8377;${parseFloat(order.totalAmount).toFixed(2)}</dd>
+    <dt>Items</dt><dd>${order.items ? order.items.length : '?'} item(s)</dd>
+    <dt>Payment Method</dt><dd>${order.payment?.method || 'RAZORPAY'}</dd>
+  `;
+
+  const area = document.getElementById('status-area');
+  const orderStatus = order.status;
+  const paymentStatus = order.payment?.status || 'PENDING';
+  area.innerHTML = `
+    <div style="margin-bottom: 8px;">
+      <span style="font-size:13px;color:#666;">Order:</span>
+      <span class="status-badge status-${orderStatus}">${orderStatus}</span>
+    </div>
+    <div>
+      <span style="font-size:13px;color:#666;">Payment:</span>
+      <span class="status-badge status-${paymentStatus}">${paymentStatus}</span>
+    </div>
+  `;
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  let attempts = 0;
+  const maxAttempts = 60; // 2 minutes
+
+  pollTimer = setInterval(async () => {
+    attempts++;
+    try {
+      const res = await fetch(`${API}/orders/${currentOrderId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!json.success) return;
+
+      const order = json.data;
+      updateOrderDisplay(order);
+
+      const paymentStatus = order.payment?.status;
+      const orderStatus = order.status;
+
+      if (paymentStatus === 'PAID' || orderStatus === 'CONFIRMED') {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        log(`Order ${orderStatus} | Payment ${paymentStatus}`);
+        markDone('step-pay');
+        markDone('step-status');
+        document.getElementById('btn-pay').textContent = 'Payment Complete!';
+        return;
+      }
+
+      if (paymentStatus === 'FAILED') {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        log(`Payment FAILED for order ${order.orderNumber}`);
+        document.getElementById('btn-pay').disabled = false;
+        document.getElementById('btn-pay').textContent = 'Retry Payment';
+        return;
+      }
+
+      if (attempts % 5 === 0) {
+        log(`Still polling... (attempt ${attempts})`);
+      }
+    } catch (e) {
+      // ignore transient errors
+    }
+
+    if (attempts >= maxAttempts) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      log('Polling timed out after 2 minutes. Check webhook configuration.');
+    }
+  }, 2000);
+
+  log('Polling order status every 2s...');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+version: "3.8"
+services:
+  api:
+    build: .
+    ports: ["3000:3000"]
+    env_file: .env
+    depends_on: [db]
+    volumes: ["./src:/app/src"]
+  db:
+    image: mysql:8.0
+    ports: ["3306:3306"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-devpass}
+      MYSQL_USER: ${DB_USER:-dev}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-devpass}
+      MYSQL_DATABASE: ${DB_NAME:-app_dev}
+    volumes: ["mysqldata:/var/lib/mysql"]
+volumes:
+  mysqldata:

@@ -1,0 +1,1369 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Arpit E-Commerce API",
+    "description": "Customer-facing REST API for the Arpit e-commerce platform.\n\n## Authentication\nMost endpoints require a **Bearer token** obtained from the OTP verification flow.\nPass it via the `Authorization: Bearer <token>` header.\n\n## Standard Response\nAll responses follow `{ success, message, data?, meta? }` format.\n\n## Error Codes\nEvery error response includes an `errorCode` field (e.g. `AUTH_003`, `CPN_008`).\nSee the **Error Codes** section at the bottom of this page for the full reference.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "API v1"
+    }
+  ],
+  "tags": [
+    { "name": "Auth", "description": "OTP-based authentication" },
+    { "name": "Customer", "description": "Customer profile" },
+    { "name": "Address", "description": "Customer delivery addresses" },
+    { "name": "Category", "description": "Product categories" },
+    { "name": "Product", "description": "Product catalog" },
+    { "name": "Product Pincode", "description": "Delivery availability check" },
+    { "name": "Coupon", "description": "Coupon listing & validation" },
+    { "name": "Order", "description": "Order management" },
+    { "name": "Payment", "description": "Payment webhooks" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Customer JWT token obtained from `POST /customers/auth/verify-otp`"
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "data": {},
+          "meta": { "$ref": "#/components/schemas/PaginationMeta" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string" },
+          "errorCode": { "type": "string", "example": "RES_001" }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Validation failed" },
+          "errorCode": { "type": "string", "example": "VAL_001" },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "example": { "body": ["phone: Phone number must be at least 10 characters"] }
+          }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer", "example": 1 },
+          "limit": { "type": "integer", "example": 20 },
+          "total": { "type": "integer", "example": 55 },
+          "totalPages": { "type": "integer", "example": 3 }
+        }
+      },
+      "CustomerProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "John Doe" },
+          "phone": { "type": "string", "example": "9876543210" },
+          "email": { "type": "string", "nullable": true, "example": "john@example.com" },
+          "isPhoneVerified": { "type": "boolean" },
+          "isEmailVerified": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "label": { "type": "string", "nullable": true, "example": "Home" },
+          "addressLine1": { "type": "string", "example": "123 Main St" },
+          "addressLine2": { "type": "string", "nullable": true },
+          "landmark": { "type": "string", "nullable": true },
+          "city": { "type": "string", "example": "Mumbai" },
+          "state": { "type": "string", "example": "Maharashtra" },
+          "postalCode": { "type": "string", "example": "400001" },
+          "country": { "type": "string", "example": "India" },
+          "phone": { "type": "string", "nullable": true },
+          "latitude": { "type": "number", "nullable": true },
+          "longitude": { "type": "number", "nullable": true },
+          "isDefault": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "Electronics" },
+          "slug": { "type": "string", "example": "electronics" },
+          "description": { "type": "string", "nullable": true },
+          "image": { "type": "string", "nullable": true },
+          "sortOrder": { "type": "integer" },
+          "parentId": { "type": "string", "format": "uuid", "nullable": true },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "products": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "CategoryDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Category" },
+          {
+            "type": "object",
+            "properties": {
+              "children": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/Category" }
+              }
+            }
+          }
+        ]
+      },
+      "ProductListItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "Wireless Headphones" },
+          "slug": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "price": { "type": "number", "example": 999.00 },
+          "comparePrice": { "type": "number", "nullable": true, "example": 1499.00 },
+          "image": { "type": "string", "nullable": true },
+          "stock": { "type": "integer" },
+          "isFeatured": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "category": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string" },
+              "slug": { "type": "string" }
+            }
+          }
+        }
+      },
+      "ProductDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ProductListItem" },
+          {
+            "type": "object",
+            "properties": {
+              "sku": { "type": "string", "nullable": true },
+              "images": { "type": "array", "items": { "type": "string" }, "nullable": true }
+            }
+          }
+        ]
+      },
+      "DeliveryCheckResult": {
+        "type": "object",
+        "properties": {
+          "deliverable": { "type": "boolean" },
+          "pincode": { "type": "string", "example": "110001" },
+          "city": { "type": "string", "example": "New Delhi" },
+          "state": { "type": "string", "example": "Delhi" }
+        }
+      },
+      "CouponListItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string", "example": "FIRST50" },
+          "description": { "type": "string", "nullable": true, "example": "50% off on first order" },
+          "discountType": { "type": "string", "enum": ["PERCENTAGE", "FLAT"] },
+          "discountValue": { "type": "number", "example": 50 },
+          "maxDiscountAmount": { "type": "number", "nullable": true, "example": 200 },
+          "minOrderAmount": { "type": "number", "nullable": true, "example": 500 },
+          "paymentMethod": { "type": "string", "enum": ["COD", "RAZORPAY"], "nullable": true },
+          "isFirstOrderOnly": { "type": "boolean" },
+          "validFrom": { "type": "string", "format": "date-time" },
+          "validUntil": { "type": "string", "format": "date-time" },
+          "isFeatured": { "type": "boolean" },
+          "banner": { "type": "string", "nullable": true, "example": "https://cdn.example.com/banner.jpg" }
+        }
+      },
+      "CouponValidationResult": {
+        "type": "object",
+        "properties": {
+          "couponId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string", "example": "FIRST50" },
+          "description": { "type": "string", "nullable": true, "example": "50% off on first order" },
+          "discountType": { "type": "string", "enum": ["PERCENTAGE", "FLAT"] },
+          "discountValue": { "type": "number", "example": 50 },
+          "discountAmount": { "type": "number", "example": 150.00 },
+          "message": { "type": "string", "example": "Coupon applied successfully" }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "productId": { "type": "string", "format": "uuid" },
+          "productName": { "type": "string" },
+          "productImage": { "type": "string", "nullable": true },
+          "productPrice": { "type": "number" },
+          "quantity": { "type": "integer" },
+          "totalPrice": { "type": "number" }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "method": { "type": "string", "enum": ["COD", "RAZORPAY"] },
+          "status": { "type": "string", "enum": ["PENDING", "PAID", "FAILED", "REFUNDED"] },
+          "amount": { "type": "number" },
+          "razorpayOrderId": { "type": "string", "nullable": true },
+          "razorpayPaymentId": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CouponUsage": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "coupon": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "description": { "type": "string", "nullable": true },
+              "discountType": { "type": "string", "enum": ["PERCENTAGE", "FLAT"] },
+              "discountValue": { "type": "number" }
+            }
+          }
+        }
+      },
+      "OrderListItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "orderNumber": { "type": "string", "example": "ORD-M3X1A9BK" },
+          "status": { "$ref": "#/components/schemas/OrderStatus" },
+          "subtotal": { "type": "number" },
+          "deliveryCharge": { "type": "number" },
+          "discount": { "type": "number" },
+          "totalAmount": { "type": "number" },
+          "notes": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "items": { "type": "integer" }
+            }
+          },
+          "payment": { "$ref": "#/components/schemas/Payment" }
+        }
+      },
+      "OrderDetail": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "orderNumber": { "type": "string" },
+          "customerId": { "type": "string", "format": "uuid" },
+          "status": { "$ref": "#/components/schemas/OrderStatus" },
+          "subtotal": { "type": "number" },
+          "deliveryCharge": { "type": "number" },
+          "discount": { "type": "number" },
+          "totalAmount": { "type": "number" },
+          "deliveryAddress": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string", "nullable": true },
+              "addressLine1": { "type": "string" },
+              "addressLine2": { "type": "string", "nullable": true },
+              "landmark": { "type": "string", "nullable": true },
+              "city": { "type": "string" },
+              "state": { "type": "string" },
+              "postalCode": { "type": "string" },
+              "country": { "type": "string" },
+              "phone": { "type": "string", "nullable": true }
+            }
+          },
+          "notes": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/OrderItem" }
+          },
+          "payment": { "$ref": "#/components/schemas/Payment" },
+          "couponUsage": { "$ref": "#/components/schemas/CouponUsage" }
+        }
+      },
+      "OrderDetailWithRazorpay": {
+        "allOf": [
+          { "$ref": "#/components/schemas/OrderDetail" },
+          {
+            "type": "object",
+            "properties": {
+              "razorpayCheckout": {
+                "type": "object",
+                "properties": {
+                  "razorpayOrderId": { "type": "string", "example": "order_PxZ1k2abc3" },
+                  "razorpayKeyId": { "type": "string", "example": "rzp_test_abc123" },
+                  "amount": { "type": "integer", "description": "Amount in paise", "example": 99900 },
+                  "currency": { "type": "string", "example": "INR" }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "OrderStatus": {
+        "type": "string",
+        "enum": ["PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "RETURNED"]
+      },
+      "PaymentMethod": {
+        "type": "string",
+        "enum": ["COD", "RAZORPAY"]
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad Request",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid Bearer token",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "success": false, "message": "Access token is required", "errorCode": "AUTH_004" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "success": false, "message": "Resource not found", "errorCode": "RES_001" }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Request validation failed",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ValidationErrorResponse" }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/customers/auth/send-otp": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Send OTP",
+        "description": "Sends a 6-digit OTP to the given phone number.\n\n**Internal flow:**\n1. Generate OTP (`000000` in dev, random 6-digit in production)\n2. Store in memory with 5-minute expiry keyed by phone\n3. In production the OTP would be sent via SMS provider\n4. Return success message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["phone"],
+                "properties": {
+                  "phone": { "type": "string", "minLength": 10, "maxLength": 20, "example": "9876543210" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "message": { "type": "string", "example": "OTP sent successfully" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "429": {
+            "description": "Rate limit exceeded (20 requests / 15 min)"
+          }
+        }
+      }
+    },
+    "/customers/auth/verify-otp": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Verify OTP & login / register",
+        "description": "Verifies the OTP and returns a JWT token. Creates the customer account automatically on first verification.\n\n**Internal flow:**\n1. Look up OTP from store by phone → `AUTH_007` if not found\n2. Check expiry → `AUTH_007` if expired\n3. Compare OTP → `AUTH_008` if mismatch\n4. Delete OTP from store (single use)\n5. Find customer by phone\n6. If exists but `isActive = false` → `AUTH_010`\n7. If not exists → create new customer with name (default \"Customer\")\n8. If exists but phone not verified → mark verified\n9. Generate JWT (14-day expiry)\n10. Return customer, token, isNewCustomer flag",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["phone", "otp"],
+                "properties": {
+                  "phone": { "type": "string", "minLength": 10, "maxLength": 20, "example": "9876543210" },
+                  "otp": { "type": "string", "minLength": 6, "maxLength": 6, "example": "000000" },
+                  "name": { "type": "string", "minLength": 1, "maxLength": 100, "example": "John Doe", "description": "Used when creating a new account" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP verified — returns customer profile and JWT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "customer": { "$ref": "#/components/schemas/CustomerProfile" },
+                            "token": { "type": "string", "example": "eyJhbGciOiJIUzI1NiIs..." },
+                            "isNewCustomer": { "type": "boolean" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or expired OTP / deactivated account",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "expired": { "value": { "success": false, "message": "OTP has expired. Please request a new one", "errorCode": "AUTH_007" } },
+                  "invalid": { "value": { "success": false, "message": "Invalid OTP", "errorCode": "AUTH_008" } },
+                  "deactivated": { "value": { "success": false, "message": "Account has been deactivated", "errorCode": "AUTH_010" } }
+                }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    },
+    "/customers/me": {
+      "get": {
+        "tags": ["Customer"],
+        "summary": "Get profile",
+        "description": "Returns the authenticated customer's profile.\n\n**Internal flow:**\n1. Extract `customerId` from JWT\n2. Find customer by ID → `RES_001` if not found\n3. Return profile",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Customer profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/CustomerProfile" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Customer"],
+        "summary": "Update profile",
+        "description": "Updates the customer's name and/or email.\n\n**Internal flow:**\n1. Extract `customerId` from JWT\n2. Update fields — if email changes, `isEmailVerified` resets to `false`\n3. Return updated profile",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1, "maxLength": 100, "example": "Jane Doe" },
+                  "email": { "type": "string", "format": "email", "maxLength": 255, "example": "jane@example.com" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/CustomerProfile" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/customers/me/addresses": {
+      "get": {
+        "tags": ["Address"],
+        "summary": "List addresses",
+        "description": "Returns all addresses for the authenticated customer.\n\n**Internal flow:**\n1. Fetch all addresses for `customerId`\n2. Sort by `isDefault DESC` then `createdAt DESC`\n3. Return array",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Array of addresses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/Address" }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Address"],
+        "summary": "Create address",
+        "description": "Creates a new delivery address.\n\n**Internal flow:**\n1. If `isDefault = true` → unset all other defaults for this customer\n2. Count existing addresses\n3. If first address → auto-set `isDefault = true` regardless of input\n4. Create address record\n5. Return created address",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["addressLine1", "city", "state", "postalCode"],
+                "properties": {
+                  "label": { "type": "string", "maxLength": 50, "example": "Home" },
+                  "addressLine1": { "type": "string", "minLength": 1, "maxLength": 255, "example": "123 Main St" },
+                  "addressLine2": { "type": "string", "maxLength": 255 },
+                  "landmark": { "type": "string", "maxLength": 255 },
+                  "city": { "type": "string", "minLength": 1, "maxLength": 100, "example": "Mumbai" },
+                  "state": { "type": "string", "minLength": 1, "maxLength": 100, "example": "Maharashtra" },
+                  "postalCode": { "type": "string", "minLength": 1, "maxLength": 20, "example": "400001" },
+                  "country": { "type": "string", "maxLength": 100 },
+                  "phone": { "type": "string", "maxLength": 20 },
+                  "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+                  "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+                  "isDefault": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Address created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/Address" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/customers/me/addresses/{id}": {
+      "get": {
+        "tags": ["Address"],
+        "summary": "Get address",
+        "description": "Returns a single address by ID (must belong to the customer).\n\n**Internal flow:**\n1. Find address by `id` + `customerId` → `RES_001` if not found\n2. Return address",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Address detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/Address" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Address"],
+        "summary": "Update address",
+        "description": "Updates an existing address.\n\n**Internal flow:**\n1. Find address by `id` + `customerId` → `RES_001` if not found\n2. If `isDefault = true` → unset all other defaults\n3. Update address fields\n4. Return updated address",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": { "type": "string", "maxLength": 50 },
+                  "addressLine1": { "type": "string", "minLength": 1, "maxLength": 255 },
+                  "addressLine2": { "type": "string", "maxLength": 255, "nullable": true },
+                  "landmark": { "type": "string", "maxLength": 255, "nullable": true },
+                  "city": { "type": "string", "minLength": 1, "maxLength": 100 },
+                  "state": { "type": "string", "minLength": 1, "maxLength": 100 },
+                  "postalCode": { "type": "string", "minLength": 1, "maxLength": 20 },
+                  "country": { "type": "string", "maxLength": 100 },
+                  "phone": { "type": "string", "maxLength": 20, "nullable": true },
+                  "latitude": { "type": "number", "minimum": -90, "maximum": 90, "nullable": true },
+                  "longitude": { "type": "number", "minimum": -180, "maximum": 180, "nullable": true },
+                  "isDefault": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/Address" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      },
+      "delete": {
+        "tags": ["Address"],
+        "summary": "Delete address",
+        "description": "Deletes an address.\n\n**Internal flow:**\n1. Find address by `id` + `customerId` → `RES_001` if not found\n2. Delete address\n3. If deleted address was default → set the most recent remaining address as default",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Address deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": ["Category"],
+        "summary": "List categories",
+        "description": "Returns all active categories.\n\n**Internal flow:**\n1. Fetch all categories where `isActive = true`\n2. Sort by `sortOrder ASC` then `name ASC`\n3. Return array with product counts",
+        "responses": {
+          "200": {
+            "description": "Array of categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/Category" }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "tags": ["Category"],
+        "summary": "Get category",
+        "description": "Returns a single category with its children.\n\n**Internal flow:**\n1. Find category by `id` where `isActive = true` → `RES_001` if not found\n2. Return category with children array",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category detail with children",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/CategoryDetail" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["Product"],
+        "summary": "List products",
+        "description": "Returns paginated, filterable list of active products.\n\n**Internal flow:**\n1. Build `where`: always `isActive = true`\n2. If `search` → OR match on name/description (CONTAINS)\n3. If `categoryId` → filter by category\n4. If `minPrice`/`maxPrice` → filter price range\n5. If `featured` → filter `isFeatured`\n6. If `inStock=true` → `stock > 0`; `false` → `stock <= 0`\n7. Parallel: paginated list + count\n8. Sort by `isFeatured DESC`, `createdAt DESC`\n9. Return products + pagination meta",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1, "minimum": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 100 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Search in name & description" },
+          { "name": "categoryId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "minPrice", "in": "query", "schema": { "type": "number", "minimum": 0 } },
+          { "name": "maxPrice", "in": "query", "schema": { "type": "number", "minimum": 0 } },
+          { "name": "featured", "in": "query", "schema": { "type": "string", "enum": ["true", "false"] } },
+          { "name": "inStock", "in": "query", "schema": { "type": "string", "enum": ["true", "false"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated product list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/ProductListItem" }
+                        },
+                        "meta": { "$ref": "#/components/schemas/PaginationMeta" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "tags": ["Product"],
+        "summary": "Get product",
+        "description": "Returns full product details.\n\n**Internal flow:**\n1. Find product by `id` where `isActive = true` → `RES_001` if not found\n2. Return product with SKU, all images, category",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/ProductDetail" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/product-pincodes/check/{productId}/{pincode}": {
+      "get": {
+        "tags": ["Product Pincode"],
+        "summary": "Check delivery availability",
+        "description": "Checks whether a product can be delivered to a given pincode.\n\n**Internal flow:**\n1. Find product by `productId` → `RES_001` if not found\n2. Look up pincode in `serviceablePincode` table\n3. If pincode not found or `isActive = false` → `{ deliverable: false }`\n4. Check `productPincode` mapping for product + pincode\n5. If mapping exists → `deliverable: true` with city/state\n6. If no mapping → `deliverable: false` with city/state",
+        "parameters": [
+          { "name": "productId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "pincode", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 10, "example": "110001" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delivery check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/DeliveryCheckResult" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/coupons/offers": {
+      "get": {
+        "tags": ["Coupon"],
+        "summary": "List featured offers",
+        "description": "Returns all currently valid featured offers open to all customers. No authentication required.\n\n**Internal flow:**\n1. Fetch coupons where `isActive = true`, `isFeatured = true`, `customerId IS NULL`, `validFrom <= now`, `validUntil >= now`\n2. Sort by `validUntil ASC`\n3. Return display-safe coupon fields",
+        "responses": {
+          "200": {
+            "description": "Array of featured offers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/CouponListItem" }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/coupons": {
+      "get": {
+        "tags": ["Coupon"],
+        "summary": "List all coupons",
+        "description": "Returns all currently valid coupons available to the authenticated customer (global + user-specific). Featured coupons appear first.\n\n**Internal flow:**\n1. Fetch coupons where `isActive = true`, `validFrom <= now`, `validUntil >= now`\n2. Filter: `customerId IS NULL` (global) OR `customerId = current customer`\n3. Sort by `isFeatured DESC`, `validUntil ASC`\n4. Return display-safe coupon fields",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Array of available coupons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/CouponListItem" }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/coupons/validate": {
+      "post": {
+        "tags": ["Coupon"],
+        "summary": "Validate coupon",
+        "description": "Validates a coupon code and returns a discount preview without applying it.\n\n**Internal flow (10-step validation):**\n1. Find coupon by code → `CPN_001` if not found\n2. Check `isActive` → `CPN_002` if inactive\n3. Check `validFrom <= now` → `CPN_004` if not yet valid\n4. Check `validUntil >= now` → `CPN_003` if expired\n5. Customer restriction → `CPN_006` if coupon is assigned to a different customer\n6. Payment method restriction → `CPN_007` if coupon doesn't match chosen payment method\n7. Min order amount → `CPN_008` if subtotal is below minimum\n8. First order only → count non-cancelled orders → `CPN_005` if customer has prior orders\n9. Global max uses → `CPN_009` if `currentUses >= maxUses`\n10. Per-customer max uses → count CouponUsage → `CPN_010` if limit reached\n11. Calculate discount:\n    - **PERCENTAGE** → `subtotal × value / 100`, capped at `maxDiscountAmount`\n    - **FLAT** → `min(discountValue, subtotal)`",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["couponCode", "subtotal", "paymentMethod"],
+                "properties": {
+                  "couponCode": { "type": "string", "minLength": 1, "description": "Auto trimmed & uppercased", "example": "FIRST50" },
+                  "subtotal": { "type": "number", "exclusiveMinimum": 0, "example": 999.00 },
+                  "paymentMethod": { "$ref": "#/components/schemas/PaymentMethod" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Coupon is valid — returns discount preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/CouponValidationResult" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Coupon validation failed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "notFound": { "value": { "success": false, "message": "Coupon not found", "errorCode": "CPN_001" } },
+                  "inactive": { "value": { "success": false, "message": "This coupon is no longer active", "errorCode": "CPN_002" } },
+                  "expired": { "value": { "success": false, "message": "This coupon has expired", "errorCode": "CPN_003" } },
+                  "notYetValid": { "value": { "success": false, "message": "This coupon is not yet valid", "errorCode": "CPN_004" } },
+                  "firstOrderOnly": { "value": { "success": false, "message": "This coupon is valid for first orders only", "errorCode": "CPN_005" } },
+                  "customerRestricted": { "value": { "success": false, "message": "This coupon is not available for your account", "errorCode": "CPN_006" } },
+                  "paymentMismatch": { "value": { "success": false, "message": "This coupon is only valid for COD payments", "errorCode": "CPN_007" } },
+                  "minOrderNotMet": { "value": { "success": false, "message": "Minimum order amount of ₹500 is required", "errorCode": "CPN_008" } },
+                  "maxUsesReached": { "value": { "success": false, "message": "This coupon has reached its maximum usage limit", "errorCode": "CPN_009" } },
+                  "perCustomerLimit": { "value": { "success": false, "message": "You have already used this coupon the maximum number of times", "errorCode": "CPN_010" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Coupon not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "success": false, "message": "Coupon not found", "errorCode": "CPN_001" }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "tags": ["Order"],
+        "summary": "Create order",
+        "description": "Creates a new order with optional coupon discount.\n\n**Internal flow:**\n1. **Validate customer** → find by JWT customerId → `RES_001` if not found\n2. **Check active** → `AUTH_010` if `isActive = false`\n3. **Validate address** → find by addressId + customerId → `RES_001` if not found\n4. **Fetch products** by all item productIds\n5. **Validate each product:**\n   - Exists → `RES_001` if missing\n   - `isActive = true` → `VAL_001` if inactive\n   - `stock >= quantity` → `VAL_001` if insufficient\n6. **Calculate subtotal** → sum of `price × quantity` for each item\n7. **Delivery charge** → `0` (hardcoded)\n8. **Validate coupon** (if `couponCode` provided):\n   - Runs all 10 coupon validation steps (see `/coupons/validate`)\n   - Returns `discountAmount` and `couponId`\n   - Without coupon → `discount = 0`\n9. **Calculate totalAmount** → `subtotal + deliveryCharge - discount`\n10. **Create Razorpay order** (if `paymentMethod = RAZORPAY`):\n    - Calls Razorpay API with amount in paise\n    - Gets `razorpayOrderId` → `PAY_002` on failure\n11. **Snapshot address** → copies address fields (immutable record)\n12. **DB Transaction:**\n    - Create `Order` (number, subtotal, deliveryCharge, discount, totalAmount, address, notes)\n    - Create `OrderItem` records (product snapshots)\n    - Create `Payment` record (method, PENDING, razorpayOrderId)\n    - **Decrement stock** for each product\n    - **Create CouponUsage** (if coupon applied)\n    - **Increment `coupon.currentUses`** (if coupon applied)\n13. Return order detail (+ `razorpayCheckout` if Razorpay)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["addressId", "items", "paymentMethod"],
+                "properties": {
+                  "addressId": { "type": "string", "format": "uuid" },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["productId", "quantity"],
+                      "properties": {
+                        "productId": { "type": "string", "format": "uuid" },
+                        "quantity": { "type": "integer", "minimum": 1 }
+                      }
+                    }
+                  },
+                  "paymentMethod": { "$ref": "#/components/schemas/PaymentMethod" },
+                  "couponCode": { "type": "string", "description": "Optional coupon code (auto trimmed & uppercased)", "example": "FIRST50" },
+                  "notes": { "type": "string", "maxLength": 1000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/OrderDetailWithRazorpay" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (inactive product, insufficient stock, coupon error)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": {
+            "description": "Razorpay order creation failed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "success": false, "message": "Failed to create Razorpay order", "errorCode": "PAY_002" }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Order"],
+        "summary": "List orders",
+        "description": "Returns the customer's orders with pagination.\n\n**Internal flow:**\n1. Fetch orders for `customerId` with skip/take pagination\n2. Sort by `createdAt DESC`\n3. Return order summaries (item count, payment) + pagination meta",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1, "minimum": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 100 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated order list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/OrderListItem" }
+                        },
+                        "meta": { "$ref": "#/components/schemas/PaginationMeta" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "tags": ["Order"],
+        "summary": "Get order detail",
+        "description": "Returns full order details including items, payment, and coupon usage.\n\n**Internal flow:**\n1. Find order by `id` + `customerId` (ownership) → `RES_001` if not found\n2. Return full order with items, payment, couponUsage",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/OrderDetail" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/orders/{id}/status": {
+      "patch": {
+        "tags": ["Order"],
+        "summary": "Update order status",
+        "description": "Updates the status of an order.\n\n**Internal flow:**\n1. Find order by `id` + `customerId` → `RES_001` if not found\n2. Update order status\n3. Return updated order",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "$ref": "#/components/schemas/OrderStatus" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/OrderDetail" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/orders/{id}/cancel": {
+      "patch": {
+        "tags": ["Order"],
+        "summary": "Cancel order",
+        "description": "Cancels a PENDING or CONFIRMED order and restores stock.\n\n**Internal flow:**\n1. Find order by `id` + `customerId` (with items & payment) → `RES_001` if not found\n2. Check status is `PENDING` or `CONFIRMED` → `VAL_001` if not\n3. If Razorpay payment is already `PAID` → `VAL_001` (must request refund instead)\n4. **DB Transaction:**\n   - Set order status to `CANCELLED`\n   - Restore stock for each item (increment by quantity)\n   - If payment status is `PENDING` → set to `FAILED`\n5. Return cancelled order",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/OrderDetail" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot cancel (wrong status or paid)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "wrongStatus": { "value": { "success": false, "message": "Order can only be cancelled when status is PENDING or CONFIRMED", "errorCode": "VAL_001" } },
+                  "alreadyPaid": { "value": { "success": false, "message": "Cannot cancel order with a completed Razorpay payment. Please request a refund instead.", "errorCode": "VAL_001" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/payments/webhook/razorpay": {
+      "post": {
+        "tags": ["Payment"],
+        "summary": "Razorpay webhook",
+        "description": "Receives payment events from Razorpay. **No auth** — validated via HMAC signature.\n\n**Internal flow:**\n1. **Verify signature** → HMAC-SHA256 of raw body with webhook secret, timing-safe compare → `PAY_001` if mismatch\n2. Extract `event`, `order_id`, `payment_id` from payload\n3. Find payment by `razorpayOrderId` → log & skip if not found\n4. **Idempotency** → skip if payment already `PAID` or `FAILED`\n5. If `payment.captured`:\n   - **Transaction:** update payment to `PAID` + save `razorpayPaymentId`, update order to `CONFIRMED`\n6. If `payment.failed`:\n   - Update payment to `FAILED` + save `razorpayPaymentId`",
+        "parameters": [
+          {
+            "name": "x-razorpay-signature",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "HMAC-SHA256 signature from Razorpay"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Razorpay webhook event payload",
+                "properties": {
+                  "event": { "type": "string", "example": "payment.captured" },
+                  "payload": {
+                    "type": "object",
+                    "properties": {
+                      "payment": {
+                        "type": "object",
+                        "properties": {
+                          "entity": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string", "example": "pay_abc123" },
+                              "order_id": { "type": "string", "example": "order_xyz789" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid webhook signature",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "success": false, "message": "Invalid webhook signature", "errorCode": "PAY_001" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
