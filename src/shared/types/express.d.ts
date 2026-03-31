@@ -1,13 +1,9 @@
 declare namespace Express {
   interface Request {
-    user?: {
-      userId: string;
-      email: string;
-      type: string;
-    };
-    customer?: {
-      customerId: string;
+    auth?: {
+      id: string;
       phone: string;
+      role: "admin" | "customer";
       type: string;
     };
     requestId?: string;

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import adminRoutes from "./modules/admin/admin.route.js";
 import categoryRoutes from "./modules/category/category.route.js";
 import productRoutes from "./modules/product/product.route.js";
 import customerRoutes from "./modules/customer/customer.route.js";
@@ -11,6 +12,7 @@ import couponRoutes from "./modules/coupon/coupon.route.js";
 const router = Router();
 
 // Register module routes here:
+router.use("/admin", adminRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/products", productRoutes);
 router.use("/customers", customerRoutes);

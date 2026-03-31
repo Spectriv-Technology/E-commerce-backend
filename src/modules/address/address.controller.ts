@@ -6,7 +6,7 @@ import * as addressService from "./address.service.js";
 import { CreateAddressInput, UpdateAddressInput } from "./dto/service.dto.js";
 
 export const list = controllerWrapper(async (req: Request, res: Response) => {
-  const addresses = await addressService.list(req.customer!.customerId);
+  const addresses = await addressService.list(req.auth!.id);
 
   return apiResponse(res, {
     statusCode: HttpStatus.OK,
@@ -16,7 +16,7 @@ export const list = controllerWrapper(async (req: Request, res: Response) => {
 });
 
 export const getById = controllerWrapper(async (req: Request, res: Response) => {
-  const address = await addressService.getById(req.params.id, req.customer!.customerId);
+  const address = await addressService.getById(req.params.id, req.auth!.id);
 
   return apiResponse(res, {
     statusCode: HttpStatus.OK,
@@ -27,7 +27,7 @@ export const getById = controllerWrapper(async (req: Request, res: Response) => 
 
 export const create = controllerWrapper(async (req: Request, res: Response) => {
   const input = req.body as CreateAddressInput;
-  const address = await addressService.create(req.customer!.customerId, input);
+  const address = await addressService.create(req.auth!.id, input);
 
   return apiResponse(res, {
     statusCode: HttpStatus.CREATED,
@@ -38,7 +38,7 @@ export const create = controllerWrapper(async (req: Request, res: Response) => {
 
 export const update = controllerWrapper(async (req: Request, res: Response) => {
   const input = req.body as UpdateAddressInput;
-  const address = await addressService.update(req.params.id, req.customer!.customerId, input);
+  const address = await addressService.update(req.params.id, req.auth!.id, input);
 
   return apiResponse(res, {
     statusCode: HttpStatus.OK,
@@ -48,7 +48,7 @@ export const update = controllerWrapper(async (req: Request, res: Response) => {
 });
 
 export const remove = controllerWrapper(async (req: Request, res: Response) => {
-  await addressService.remove(req.params.id, req.customer!.customerId);
+  await addressService.remove(req.params.id, req.auth!.id);
 
   return apiResponse(res, {
     statusCode: HttpStatus.OK,

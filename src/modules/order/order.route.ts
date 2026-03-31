@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { validate } from "../../middlewares/validate.middleware.js";
-import { customerAuthMiddleware } from "../../middlewares/customerAuth.middleware.js";
+import { requireCustomer } from "../../middlewares/auth.middleware.js";
 import {
   createOrderBody,
   listOrdersQuery,
@@ -12,7 +12,7 @@ import * as orderController from "./order.controller.js";
 const router = Router();
 
 // All order routes require customer auth
-router.use(customerAuthMiddleware);
+router.use(requireCustomer);
 
 router.post(
   "/",

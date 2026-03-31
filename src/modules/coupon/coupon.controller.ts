@@ -20,7 +20,7 @@ export const offers = controllerWrapper(
 export const list = controllerWrapper(
   async (req: Request, res: Response) => {
     const coupons = await couponService.listCoupons(
-      req.customer!.customerId
+      req.auth!.id
     );
 
     return apiResponse(res, {
@@ -35,7 +35,7 @@ export const validate = controllerWrapper(
   async (req: Request, res: Response) => {
     const input = req.body as ValidateCouponInput;
     const result = await couponService.validateCoupon(
-      req.customer!.customerId,
+      req.auth!.id,
       input
     );
 

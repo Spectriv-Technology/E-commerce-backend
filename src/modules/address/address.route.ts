@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { validate } from "../../middlewares/validate.middleware.js";
-import { customerAuthMiddleware } from "../../middlewares/customerAuth.middleware.js";
+import { requireCustomer } from "../../middlewares/auth.middleware.js";
 import { createAddressBody, updateAddressBody, addressIdParams } from "./dto/request.dto.js";
 import * as addressController from "./address.controller.js";
 
 const router = Router();
 
 // All address routes require customer auth
-router.use(customerAuthMiddleware);
+router.use(requireCustomer);
 
 router.get("/", addressController.list);
 

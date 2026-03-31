@@ -6,6 +6,19 @@ datasource db {
   provider = "mysql"
 }
 
+model Admin {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(100)
+  phone     String   @unique @db.VarChar(20)
+  email     String?  @unique @db.VarChar(255)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phone])
+  @@map("admins")
+}
+
 model Category {
   id          String    @id @default(uuid())
   name        String    @db.VarChar(100)

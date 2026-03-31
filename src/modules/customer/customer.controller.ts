@@ -37,7 +37,7 @@ export const verifyOtp = controllerWrapper(async (req: Request, res: Response) =
 // ── Profile ──
 
 export const getProfile = controllerWrapper(async (req: Request, res: Response) => {
-  const customer = await customerService.getProfile(req.customer!.customerId);
+  const customer = await customerService.getProfile(req.auth!.id);
 
   return apiResponse(res, {
     statusCode: HttpStatus.OK,
@@ -48,7 +48,7 @@ export const getProfile = controllerWrapper(async (req: Request, res: Response) 
 
 export const updateProfile = controllerWrapper(async (req: Request, res: Response) => {
   const input = req.body as UpdateProfileInput;
-  const customer = await customerService.updateProfile(req.customer!.customerId, input);
+  const customer = await customerService.updateProfile(req.auth!.id, input);
 
   return apiResponse(res, {
     statusCode: HttpStatus.OK,

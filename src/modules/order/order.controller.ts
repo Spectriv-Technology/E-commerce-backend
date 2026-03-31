@@ -12,7 +12,7 @@ import {
 
 export const create = controllerWrapper(async (req: Request, res: Response) => {
   const input = req.body as CreateOrderInput;
-  const order = await orderService.create(req.customer!.customerId, input);
+  const order = await orderService.create(req.auth!.id, input);
 
   const message =
     input.paymentMethod === "RAZORPAY"
@@ -29,7 +29,7 @@ export const create = controllerWrapper(async (req: Request, res: Response) => {
 export const list = controllerWrapper(async (req: Request, res: Response) => {
   const input = req.query as unknown as ListOrdersInput;
   const { orders, total } = await orderService.list(
-    req.customer!.customerId,
+    req.auth!.id,
     input
   );
 
@@ -45,7 +45,7 @@ export const getById = controllerWrapper(
   async (req: Request, res: Response) => {
     const order = await orderService.getById(
       req.params.id,
-      req.customer!.customerId
+      req.auth!.id
     );
 
     return apiResponse(res, {
@@ -61,7 +61,7 @@ export const updateStatus = controllerWrapper(
     const input = req.body as UpdateOrderStatusInput;
     const order = await orderService.updateStatus(
       req.params.id,
-      req.customer!.customerId,
+      req.auth!.id,
       input
     );
 
@@ -77,7 +77,7 @@ export const cancel = controllerWrapper(
   async (req: Request, res: Response) => {
     const order = await orderService.cancel(
       req.params.id,
-      req.customer!.customerId
+      req.auth!.id
     );
 
     return apiResponse(res, {

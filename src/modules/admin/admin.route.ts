@@ -1,13 +1,9 @@
 import { Router } from "express";
 import { validate } from "../../middlewares/validate.middleware.js";
-import { requireCustomer } from "../../middlewares/auth.middleware.js";
+import { requireAdmin } from "../../middlewares/auth.middleware.js";
 import { authRateLimiter } from "../../middlewares/rateLimiter.middleware.js";
-import {
-  sendOtpBody,
-  verifyOtpBody,
-  updateProfileBody,
-} from "./dto/request.dto.js";
-import * as customerController from "./customer.controller.js";
+import { sendOtpBody, verifyOtpBody } from "./dto/request.dto.js";
+import * as adminController from "./admin.controller.js";
 
 const router = Router();
 
@@ -16,24 +12,17 @@ router.post(
   "/auth/send-otp",
   authRateLimiter,
   validate({ body: sendOtpBody }),
-  customerController.sendOtp
+  adminController.sendOtp
 );
 
 router.post(
   "/auth/verify-otp",
   authRateLimiter,
   validate({ body: verifyOtpBody }),
-  customerController.verifyOtp
+  adminController.verifyOtp
 );
 
 // ── Profile (authenticated) ──
-router.get("/me", requireCustomer, customerController.getProfile);
-
-router.patch(
-  "/me",
-  requireCustomer,
-  validate({ body: updateProfileBody }),
-  customerController.updateProfile
-);
+router.get("/me", requireAdmin, adminController.getProfile);
 
 export default router;

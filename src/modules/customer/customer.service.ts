@@ -1,11 +1,13 @@
-import jwt from "jsonwebtoken";
 import { prisma } from "../../config/database.config.js";
-import { env } from "../../config/env.config.js";
 import { logger } from "../../config/logger.config.js";
-import { redis } from "../../config/redis.config.js";
 import { HttpError } from "../../shared/utils/httpErrors.js";
 import { HttpStatus } from "../../shared/constants/httpStatus.js";
 import { ErrorCode } from "../../shared/constants/errorCodes.js";
+import {
+  storeOtp,
+  verifyOtp as verifyStoredOtp,
+  generateToken,
+} from "../../shared/utils/auth.utils.js";
 import { customerProfileSelect } from "./models/customer.model.js";
 import {
   SendOtpInput,
@@ -13,29 +15,10 @@ import {
   UpdateProfileInput,
 } from "./dto/service.dto.js";
 
-const OTP_EXPIRY_SECONDS = 300; // 5 minutes
-
-const generateOtp = (): string => {
-  if (env.NODE_ENV === "development") {
-    return "000000";
-  }
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-const generateToken = (customerId: string, phone: string): string => {
-  return jwt.sign(
-    { customerId, phone, type: "access" },
-    env.JWT_ACCESS_SECRET,
-    { expiresIn: "14d" }
-  );
-};
-
 // ── Auth ──
 
 export const sendOtp = async (input: SendOtpInput) => {
-  const otp = generateOtp();
-
-  await redis.set(`otp:${input.phone}`, otp, "EX", OTP_EXPIRY_SECONDS);
+  await storeOtp("customer", input.phone);
 
   // In production, send OTP via SMS provider
   logger.info("OTP sent", { phone: input.phone });
@@ -44,26 +27,7 @@ export const sendOtp = async (input: SendOtpInput) => {
 };
 
 export const verifyOtp = async (input: VerifyOtpInput) => {
-  const storedOtp = await redis.get(`otp:${input.phone}`);
-
-  if (!storedOtp) {
-    throw new HttpError(
-      HttpStatus.BAD_REQUEST,
-      "OTP not found or expired. Please request a new one",
-      ErrorCode.AUTH_OTP_EXPIRED
-    );
-  }
-
-  if (storedOtp !== input.otp) {
-    throw new HttpError(
-      HttpStatus.BAD_REQUEST,
-      "Invalid OTP",
-      ErrorCode.AUTH_OTP_INVALID
-    );
-  }
-
-  // OTP valid — remove it
-  await redis.del(`otp:${input.phone}`);
+  await verifyStoredOtp("customer", input.phone, input.otp);
 
   // Find or create customer
   let customer = await prisma.customer.findUnique({
@@ -98,7 +62,7 @@ export const verifyOtp = async (input: VerifyOtpInput) => {
     });
   }
 
-  const token = generateToken(customer.id, customer.phone);
+  const token = generateToken(customer.id, customer.phone, "customer");
 
   return { customer, token, isNewCustomer };
 };
